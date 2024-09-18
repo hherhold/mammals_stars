@@ -1,0 +1,51 @@
+#
+# Makefile for mammal files from Wandrille, Sep 2024.
+#
+# Not the best Makefile, but it works. Mostly.
+#
+
+OPENSPACE_CACHE_DIR = /mnt/e/OpenSpace/user/cache
+OPENSPACE_ASSET_DIR = /mnt/e/OpenSpace/user/data/assets/mammals_stars
+
+# A CSV file gets turned into a .speck file and an anchor
+# .asset file. Let's make a list of all the .csv files in the current
+# directory. We'll use this list in the default rule.
+CSV_FILES = \
+	eukaryotes_class.csv \
+	mammals_families.csv \
+	mammals_order.csv \
+	primates_species.csv
+
+SPECK_FILES = $(patsubst %.csv,%.speck,$(CSV_FILES))
+
+.PHONY: install tarball clean target_speck_files
+
+# How to make output files from a csv file. The csv file is the
+# input, the speck, label, and anchor files are the output. 
+%.speck: %.csv
+	./csv_to_speck_and_label.py -i $< -lum 10.0 -absmag -20.0
+
+clean:
+	rm -f *.speck *.asset
+
+target_speck_files: $(SPECK_FILES)
+
+# This is the rule to copy the files to the OpenSpace asset directory. We'll make sure the
+# directory exists, and then copy the files. We will also clean the cache directory before
+# we start. This directory gets populated with the target files, and we want to make sure
+# it's empty before we start. OpenSpace is supposed to re-read files from the asset
+# directory if directed to do so, rather than the cached file, but either it doesn't do
+# what it's supposed to do, or I don't understand how caching is supposed to work. So
+# we'll just clean the cache directory to be sure.
+install: $(SPECK_FILES)
+	for file in $(shell ls *.speck *.asset) ; do \
+		rm -rf $(OPENSPACE_CACHE_DIR)/$$file  ; \
+	done
+	mkdir -p $(OPENSPACE_ASSET_DIR)
+	cp *.speck *.asset $(OPENSPACE_ASSET_DIR)
+
+tarball:
+	tar -cvf mammals_stars.tar $(INSTALLED_FILES) Makefile *.ipynb
+	gzip mammals_stars.tar
+
+default: install
