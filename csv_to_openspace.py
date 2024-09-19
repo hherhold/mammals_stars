@@ -204,6 +204,8 @@ def make_stars_asset_from_dataframe(input_points_df,
                                     glare_scale):
 
     output_filename = filename_base + ".asset"
+    output_asset_position_name = filename_base + "_position"
+
     with open(output_filename, "w") as output_file:
         print("local sunspeck = asset.resource({", file=output_file)
         print("  Name = \"Stars Speck Files\",", file=output_file)
@@ -226,20 +228,32 @@ def make_stars_asset_from_dataframe(input_points_df,
         print("  Version = 1", file=output_file)
         print("})", file=output_file)
         print("", file=output_file)
-        print(f"local {filename_base}_speck = asset.resource(\"{filename_base}.speck\")", file=output_file)
-        print("", file=output_file)
-        print(f"local {filename_base} = {{", file=output_file)
-        print(f"  Identifier = \"{filename_base}\",", file=output_file)
+
+        print("local meters_in_pc = 3.0856775814913673e+16", file=output_file)
+        print(f"local {output_asset_position_name} = {{", file=output_file)
+        print(f"    Identifier = \"{output_asset_position_name}\",", file=output_file)
         print("  Transform = {", file=output_file)
         print("    Translation = {", file=output_file)
         print("      Type = \"StaticTranslation\",", file=output_file)
         print("      Position = {", file=output_file)
-        print(f"        {input_points_df_centroid["x"]},", file=output_file)
-        print(f"        {input_points_df_centroid["y"]},", file=output_file)
-        print(f"        {input_points_df_centroid["z"]},", file=output_file)
+        print(f"        {input_points_df_centroid["x"]} * meters_in_pc,", file=output_file)
+        print(f"        {input_points_df_centroid["y"]} * meters_in_pc,", file=output_file)
+        print(f"        {input_points_df_centroid["z"]} * meters_in_pc,", file=output_file)
         print("      }", file=output_file)
+        print("     }", file=output_file)
         print("    },", file=output_file)
-        print("   },", file=output_file)
+        print("  GUI = {", file=output_file)
+        print(f"    Name = \"{output_asset_position_name}\",", file=output_file)
+        print(f"    Path = \"/Labels\",", file=output_file)
+        print(f"    Hidden = true", file=output_file)
+        print("  }", file=output_file)
+        print("}", file=output_file)
+
+        print(f"local {filename_base}_speck = asset.resource(\"{filename_base}.speck\")", file=output_file)
+        print("", file=output_file)
+        print(f"local {filename_base} = {{", file=output_file)
+        print(f"  Identifier = \"{filename_base}\",", file=output_file)
+        print(f"  Parent = {output_asset_position_name}.Identifier,", file=output_file)
         print(f"  Renderable = {{", file=output_file)
         print("    UseCaching = false,", file=output_file)
         print("    Type = \"RenderableStars\",", file=output_file)
@@ -278,11 +292,14 @@ def make_stars_asset_from_dataframe(input_points_df,
         print("  }", file=output_file)
         print("}", file=output_file)
         print("asset.onInitialize(function()", file=output_file)
+        print(f"  openspace.addSceneGraphNode({output_asset_position_name})", file=output_file)
         print(f"  openspace.addSceneGraphNode({filename_base})", file=output_file)
         print("end)", file=output_file)
         print("asset.onDeinitialize(function()", file=output_file)
         print(f"  openspace.removeSceneGraphNode({filename_base})", file=output_file)
+        print(f"  openspace.removeSceneGraphNode({output_asset_position_name})", file=output_file)
         print("end)", file=output_file)
+        print(f"asset.export({output_asset_position_name})", file=output_file)
         print(f"asset.export({filename_base})", file=output_file)
 
     # Return the name of the asset file we created.
@@ -305,19 +322,31 @@ def make_labels_from_dataframe(input_points_df,
     # extension.
     output_asset_filename = filename_base + "_" + label_column + ".asset"
     output_asset_variable_name = filename_base + "_" + label_column + "_labels"
+    output_asset_position_name = output_asset_variable_name + "_position"
     with open(output_asset_filename, "w") as output_file:
-        print(f"local {output_asset_variable_name} = {{", file=output_file)
-        print(f"    Identifier = \"{output_asset_variable_name}\",", file=output_file)
+        print("local meters_in_pc = 3.0856775814913673e+16", file=output_file)
+        print(f"local {output_asset_position_name} = {{", file=output_file)
+        print(f"    Identifier = \"{output_asset_position_name}\",", file=output_file)
         print("  Transform = {", file=output_file)
         print("    Translation = {", file=output_file)
         print("      Type = \"StaticTranslation\",", file=output_file)
         print("      Position = {", file=output_file)
-        print(f"        {input_points_df_centroid["x"]},", file=output_file)
-        print(f"        {input_points_df_centroid["y"]},", file=output_file)
-        print(f"        {input_points_df_centroid["z"]},", file=output_file)
+        print(f"        {input_points_df_centroid["x"]} * meters_in_pc,", file=output_file)
+        print(f"        {input_points_df_centroid["y"]} * meters_in_pc,", file=output_file)
+        print(f"        {input_points_df_centroid["z"]} * meters_in_pc,", file=output_file)
         print("      }", file=output_file)
-        print("     },", file=output_file)
+        print("     }", file=output_file)
         print("    },", file=output_file)
+        print("  GUI = {", file=output_file)
+        print(f"    Name = \"{output_asset_position_name}\",", file=output_file)
+        print(f"    Path = \"/Labels\",", file=output_file)
+        print(f"    Hidden = true", file=output_file)
+        print("  }", file=output_file)
+        print(" }", file=output_file)
+
+        print(f"local {output_asset_variable_name} = {{", file=output_file)
+        print(f"    Identifier = \"{output_asset_variable_name}\",", file=output_file)
+        print(f"    Parent = {output_asset_position_name}.Identifier,", file=output_file)
         print("    Renderable = {", file=output_file)
         print("        Type = \"RenderablePointCloud\",", file=output_file)
         print("        Labels = {", file=output_file)
@@ -334,12 +363,16 @@ def make_labels_from_dataframe(input_points_df,
         print("    }", file=output_file)
         print("}", file=output_file)
         print("asset.onInitialize(function()", file=output_file)
+        print(f"    openspace.addSceneGraphNode({output_asset_position_name});", file=output_file)
         print(f"    openspace.addSceneGraphNode({output_asset_variable_name});", file=output_file)
         print("end)", file=output_file)
         print("asset.onDeinitialize(function()", file=output_file)
         print(f"    openspace.removeSceneGraphNode({output_asset_variable_name});", file=output_file)
+        print(f"    openspace.removeSceneGraphNode({output_asset_position_name});", file=output_file)
         print("end)", file=output_file)
+        print(f"asset.export({output_asset_position_name})", file=output_file)
         print(f"asset.export({output_asset_variable_name})", file=output_file)
+
 
     output_files.append(output_asset_filename)
 
@@ -411,36 +444,6 @@ def main():
         # output files.
         filename_base = row["csv_file"].replace(".csv", "")
 
-        # This will hopefully one day be a vestigial tail that can be removed.
-        # It's a hack to make the anchor asset file. The anchor is a point in
-        # world space that can be pointed at by the camera. This is the centroid
-        # of the data in world space. We do this first because in the later
-        # sections for making the stars and label assets, the coordinates of the
-        # points are translated so that the local centroid of each set is at 0,0,0
-        # and the whole set is translated to world coordinates. The idea is then
-        # you can point at that asset and it points to the local 0,0,0 centroid
-        # of the points. Except that either it doesn't work, or I'm doing it
-        # wrong.
-        if row["type"] == "anchor":
-            print("Creating anchor... ", end="", flush=True)
-            # This is kinda hacky. math.isnan() will throw a TypeError if the value
-            # is a string. If it IS a string, we can just proceed. If it's a NaN,
-            # we need to change it to None. This is all because empty cells are 
-            # read in as NaN by pandas. There's probably a way to make empty
-            # cells read in as None, but I don't know what it is.
-            fade_target = ""
-            try:
-                if math.isnan(row["fade_target"]):
-                    fade_target = None
-            except TypeError:
-                fade_target = row["fade_target"]
-            files_created += \
-                make_anchor_asset_from_dataframe(input_points_df=input_points_df, 
-                                                filename_base=filename_base,
-                                                fade_target=fade_target)
-        
-        print("Done.")
-
         # All points are in the same coordinate frame, with the origin of everything
         # at 0,0,0. This means that if we want to be able to point the camera at a 
         # specific group of points, we have to make an asset (a cartesian axes
@@ -457,6 +460,7 @@ def main():
         input_points_df_centroid["x"] = input_points_df["x"].mean()
         input_points_df_centroid["y"] = input_points_df["y"].mean()
         input_points_df_centroid["z"] = input_points_df["z"].mean()
+        #print("Centroid: ", input_points_df_centroid)
 
         # Translate all the points so that the new centroid of the points is 0,0,0.
         input_points_df["x"] = input_points_df["x"] - input_points_df_centroid["x"]
@@ -508,7 +512,9 @@ def main():
                                                 glare_multiplier=row["glare_multiplier"],
                                                 glare_gamma=row["glare_gamma"],
                                                 glare_scale=row["glare_scale"])
-            
+        print("Done.")
+
+
     # Now we need to make a list of all the .asset and .speck files we created
     # so these can be flushed from the cache directory.
     print("Cleaning cache directory...", end="", flush=True)
