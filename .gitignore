@@ -1,0 +1,6 @@
+*.speck
+*.asset
+*.cmap
+*.label
+.vscode/
+explosion_dust_openspace_files/
