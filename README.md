@@ -37,3 +37,4 @@ First `cd` into the data dir, then run:
 
 `../csv_to_openspace.py -i mammals_families_species_dataset.csv -c /mnt/e/OpenSpace/user/cache -a /mnt/e/OpenSpace/user/data/assets/mammals_families_species_stars`
 
+Then make sure your profile is set up to load the new assets.
