@@ -111,7 +111,7 @@ def make_stars_speck_from_dataframe(input_points_df, filename_base,
     return([output_speck_filename])
 
 def make_stars_asset_from_dataframe(input_points_df, 
-                                    input_points_df_centroid,
+                                    input_points_world_position,
                                     filename_base, 
                                     magnitude_exponent,
                                     core_multiplier,
@@ -176,9 +176,9 @@ def make_stars_asset_from_dataframe(input_points_df,
         print("    Translation = {", file=output_file)
         print("      Type = \"StaticTranslation\",", file=output_file)
         print("      Position = {", file=output_file)
-        print(f"        {input_points_df_centroid["x"]} * meters_in_pc,", file=output_file)
-        print(f"        {input_points_df_centroid["y"]} * meters_in_pc,", file=output_file)
-        print(f"        {input_points_df_centroid["z"]} * meters_in_pc,", file=output_file)
+        print(f"        {input_points_world_position["x"]} * meters_in_pc,", file=output_file)
+        print(f"        {input_points_world_position["y"]} * meters_in_pc,", file=output_file)
+        print(f"        {input_points_world_position["z"]} * meters_in_pc,", file=output_file)
         print("      }", file=output_file)
         print("     }", file=output_file)
         print("    },", file=output_file)
@@ -259,7 +259,7 @@ def make_stars_asset_from_dataframe(input_points_df,
     return([output_filename])
 
 def make_labels_from_dataframe(input_points_df, 
-                               input_points_df_centroid,
+                               input_points_world_position,
                                filename_base,
                                label_column, label_size, label_minsize, label_maxsize, enabled):
     output_files = []
@@ -284,9 +284,9 @@ def make_labels_from_dataframe(input_points_df,
         print("    Translation = {", file=output_file)
         print("      Type = \"StaticTranslation\",", file=output_file)
         print("      Position = {", file=output_file)
-        print(f"        {input_points_df_centroid["x"]} * meters_in_pc,", file=output_file)
-        print(f"        {input_points_df_centroid["y"]} * meters_in_pc,", file=output_file)
-        print(f"        {input_points_df_centroid["z"]} * meters_in_pc,", file=output_file)
+        print(f"        {input_points_world_position["x"]} * meters_in_pc,", file=output_file)
+        print(f"        {input_points_world_position["y"]} * meters_in_pc,", file=output_file)
+        print(f"        {input_points_world_position["z"]} * meters_in_pc,", file=output_file)
         print("      }", file=output_file)
         print("     }", file=output_file)
         print("    },", file=output_file)
@@ -364,28 +364,21 @@ def main():
         # output files.
         filename_base = row["csv_file"].replace(".csv", "")
 
-        # All points are in the same coordinate frame, with the origin of everything
-        # at 0,0,0. This means that if we want to be able to point the camera at a 
-        # specific group of points, we have to make an asset (a cartesian axes
-        # renderable) that is the centroid of the points as an anchor to point at. We
-        # don't actually view this asset, it's just there as a convenience for the user.
-        # This is annoying. This means an anchor asset for every set of points.
-        # Instead, what we do is compute the centroid of each set of points, translate
-        # all the points so that their new centroid is 0,0,0, and then add a
-        # translation to the renderable. This way, the renderable thinks all of
-        # its points are at 0,0,0, but the points are actually at their original
-        # locations. This allows us to point the camera at a set of points without
-        # having another asset that is a stand-in for the centroid of the points.
-        input_points_df_centroid = {}
-        input_points_df_centroid["x"] = input_points_df["x"].mean()
-        input_points_df_centroid["y"] = input_points_df["y"].mean()
-        input_points_df_centroid["z"] = input_points_df["z"].mean()
-        #print("Centroid: ", input_points_df_centroid)
+        # All points are originally in world coordinates. A problem with this is we
+        # need to be able to point the camera to certain locations, such as the center
+        # of a set of points. To do this, we need to translate the points so that the
+        # centroid of the points is locally at 0,0,0, and then move that whole set of
+        # points to its original location using a transform.
+        input_points_world_position = {}
+        input_points_world_position["x"] = input_points_df["x"].mean()
+        input_points_world_position["y"] = input_points_df["y"].mean()
+        input_points_world_position["z"] = input_points_df["z"].mean()
+        #print("Centroid (world position of center of points): ", input_points_world_position)
 
         # Translate all the points so that the new centroid of the points is 0,0,0.
-        input_points_df["x"] = input_points_df["x"] - input_points_df_centroid["x"]
-        input_points_df["y"] = input_points_df["y"] - input_points_df_centroid["y"]
-        input_points_df["z"] = input_points_df["z"] - input_points_df_centroid["z"]
+        input_points_df["x"] = input_points_df["x"] - input_points_world_position["x"]
+        input_points_df["y"] = input_points_df["y"] - input_points_world_position["y"]
+        input_points_df["z"] = input_points_df["z"] - input_points_world_position["z"]
 
         if row["type"] == "labels":
             print("Creating labels... ", end="", flush=True)
@@ -400,7 +393,7 @@ def main():
                 row["enabled"] = "false"
             files_created += \
                 make_labels_from_dataframe(input_points_df=input_points_df,
-                                           input_points_df_centroid=input_points_df_centroid,
+                                           input_points_world_position=input_points_world_position,
                                            filename_base=filename_base,
                                            label_column=row["label_column"],
                                            label_size=row["label_size"],
@@ -423,7 +416,7 @@ def main():
             # Now an asset file that will be used to load the speck file into OpenSpace.
             files_created += \
                 make_stars_asset_from_dataframe(input_points_df=input_points_df, 
-                                                input_points_df_centroid=input_points_df_centroid,
+                                                input_points_world_position=input_points_world_position,
                                                 filename_base=filename_base,
                                                 magnitude_exponent=row["MagnitudeExponent"],
                                                 core_multiplier=row["core_multiplier"],
