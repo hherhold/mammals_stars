@@ -331,6 +331,51 @@ def make_labels_from_dataframe(input_points_df,
 
     return(output_files)
 
+def make_group_labels_from_dataframe(input_points_df,
+                                     input_points_world_position,
+                                     filename_base,
+                                     label_column, 
+                                     label_size, 
+                                     label_minsize, 
+                                     label_maxsize, 
+                                     enabled):
+
+    # First we want to figure out the unique values in the label column. These
+    # are the groups we want to create labels for.
+    groups = input_points_df[label_column].unique()
+
+    # Now we want to make a new empty dataframe with the same columns as the
+    # input_points_df. This new dataframe will contain the centroids of the
+    # groups.
+    centroids_df = pd.DataFrame(columns=input_points_df.columns)
+    for group in groups:
+        # Get the rows that belong to this group.
+        group_rows = input_points_df[input_points_df[label_column] == group]
+        # Calculate the centroid of the group.
+        centroid = {}
+        centroid["x"] = group_rows["x"].mean()
+        centroid["y"] = group_rows["y"].mean()
+        centroid["z"] = group_rows["z"].mean()
+        # Add the group name to the centroid.
+        centroid[label_column] = group
+
+        # If x is non nan, add the centroid to the new dataframe.
+        if not math.isnan(centroid["x"]):
+            centroids_df.loc[len(centroids_df)] = centroid
+
+    # Now we have a dataframe with the centroids of the groups. We can use this
+    # to create the labels using the make_labels_from_dataframe function.
+    output_files = make_labels_from_dataframe(input_points_df=centroids_df,
+                                              input_points_world_position=input_points_world_position,
+                                              filename_base=filename_base + "_group",
+                                              label_column=label_column,
+                                              label_size=label_size,
+                                              label_minsize=label_minsize,
+                                              label_maxsize=label_maxsize,
+                                              enabled=enabled)
+
+    return(output_files)
+
 def main():
     args = parser.parse_args()
 
@@ -400,6 +445,30 @@ def main():
                                            label_minsize=row["label_minsize"],
                                            label_maxsize=row["label_maxsize"],
                                            enabled=row["enabled"])
+            
+        # Datasets contain many points that fall into common groupings, such as phyla,
+        # classes, kingdoms, etc. Rather than have many points with the same label, we
+        # can create a single label for the group that sits in the middle of all these
+        # points. This is useful for large datasets where the labels would otherwise
+        # overlap.
+        elif row["type"] == "group_labels":
+            print("Creating group labels... ", end="", flush=True)
+            # Same thing as above, for enabled.
+            if row["enabled"] == 1:
+                row["enabled"] = "true"
+            else:
+                row["enabled"] = "false"
+            files_created += \
+                make_group_labels_from_dataframe(input_points_df=input_points_df,
+                                                 input_points_world_position=input_points_world_position,
+                                                 filename_base=filename_base,
+                                                 label_column=row["label_column"],
+                                                 label_size=row["label_size"],
+                                                 label_minsize=row["label_minsize"],
+                                                 label_maxsize=row["label_maxsize"],
+                                                 enabled=row["enabled"])
+
+
 
         elif row["type"] == "stars":
             print("Creating stars... ", end="", flush=True)
