@@ -2,5 +2,6 @@
 *.asset
 *.cmap
 *.label
+*_points.csv
 .vscode/
 explosion_dust_openspace_files/

@@ -35,6 +35,9 @@ import os
 import math
 from pathlib import Path
 
+from random import randrange
+
+
 parser = argparse.ArgumentParser(description="Process input CSV files for OpenSpace.")
 parser.add_argument("-i", "--input_dataset_csv_file", help="Input dataset CSV file.", 
                     required=True)
@@ -45,7 +48,7 @@ parser.add_argument("-a", "--asset_dir", help="Output directory for assets.",
 parser.add_argument("-v", "--verbose", help="Verbose output.", action="store_true")
 
 def make_stars_speck_from_dataframe(input_points_df, filename_base,
-                                    lum, absmag, colorb_v):
+                                    lum, absmag, colorb_v, texnum):
 
     output_speck_filename = filename_base + ".speck"
 
@@ -72,7 +75,7 @@ def make_stars_speck_from_dataframe(input_points_df, filename_base,
         input_points_df["lum"] = lum
         input_points_df["absmag"] = absmag
         input_points_df["appmag"] = 0.0
-        input_points_df["texnum"] = 0
+        input_points_df["texnum"] = texnum
         input_points_df["distly"] = 0.0
         input_points_df["dcalc"] = 0
         input_points_df["plx"] = 0.0
@@ -83,6 +86,7 @@ def make_stars_speck_from_dataframe(input_points_df, filename_base,
         input_points_df["speed"] = 0
 
         # For each row in the CSV file (pandas dataframe), we will write a line to the output file.
+        num_rows = len(input_points_df)
         for index, row in input_points_df.iterrows():
             # Split the line into a list of strings.
             datavars = []
@@ -90,7 +94,11 @@ def make_stars_speck_from_dataframe(input_points_df, filename_base,
             datavars.append(str(row["x"]))
             datavars.append(str(row["y"]))
             datavars.append(str(row["z"]))
+            
             datavars.append(str(row["colorb_v"]))
+            #scale_fac = index / num_rows
+            #datavars.append(str(scale_fac))
+
             datavars.append(str(row["lum"]))
             datavars.append(str(row["absmag"]))
             datavars.append(str(row["appmag"]))
@@ -120,7 +128,7 @@ def make_stars_asset_from_dataframe(input_points_df,
                                     glare_multiplier,
                                     glare_gamma,
                                     glare_scale,
-                                    fade_target):
+                                    fade_targets):
 
     output_filename = filename_base + ".asset"
     output_asset_position_name = filename_base + "_position"
@@ -133,6 +141,7 @@ def make_stars_asset_from_dataframe(input_points_df,
         print("  Version = 1", file=output_file)
         print("})", file=output_file)
         print("", file=output_file)
+        """
         print("local colormaps = asset.resource({", file=output_file)
         print("  Name = \"Stars Color Table\",", file=output_file)
         print("  Type = \"HttpSynchronization\",", file=output_file)
@@ -140,6 +149,7 @@ def make_stars_asset_from_dataframe(input_points_df,
         print("  Version = 3", file=output_file)
         print("})", file=output_file)
         print("", file=output_file)
+        """
         print("local textures = asset.resource({", file=output_file)
         print("  Name = \"Stars Textures\",", file=output_file)
         print("  Type = \"HttpSynchronization\",", file=output_file)
@@ -150,8 +160,8 @@ def make_stars_asset_from_dataframe(input_points_df,
 
         # "Declare" fade var so it can be used below.
         fade_varname = ""
-        if fade_target:
-            fade_varname = f"{filename_base}_fade_{fade_target}"
+        if fade_targets:
+            fade_varname = f"{filename_base}_fade_command"
 
             print(f"local {fade_varname} = {{", file=output_file)
             print(f"    Identifier = \"{fade_varname}\",", file=output_file)
@@ -161,9 +171,11 @@ def make_stars_asset_from_dataframe(input_points_df,
             print("      openspace.printInfo(\"Transition: \" .. args.Transition)", file=output_file)
             print("", file=output_file)
             print("      if args.Transition == \"Approaching\" then", file=output_file)
-            print(f"        openspace.setPropertyValueSingle(\"Scene.{fade_target}.Renderable.Fade\", 0.0, 1.0)", file=output_file)
+            for fade_target in fade_targets:
+                print(f"        openspace.setPropertyValueSingle(\"Scene.{fade_target}.Renderable.Fade\", 0.0, 1.0)", file=output_file)
             print("      elseif args.Transition == \"Exiting\" then", file=output_file)
-            print(f"        openspace.setPropertyValueSingle(\"Scene.{fade_target}.Renderable.Fade\", 1.0, 1.0)", file=output_file)
+            for fade_target in fade_targets:
+                print(f"        openspace.setPropertyValueSingle(\"Scene.{fade_target}.Renderable.Fade\", 1.0, 1.0)", file=output_file)
             print("      end", file=output_file)
             print("    ]],", file=output_file)
             print("    IsLocal = true", file=output_file)
@@ -189,7 +201,21 @@ def make_stars_asset_from_dataframe(input_points_df,
         print("  }", file=output_file)
         print("}", file=output_file)
 
+        # Hack - colormap file.
+        cmap_filename = filename_base + ".cmap"
+        with open(cmap_filename, "w") as cmap_file:
+            print("# OpenSpace colormap file", file=cmap_file)
+            print("", file=cmap_file)
+            print("5", file=cmap_file)
+            print("1.0 1.0 1.0 0.5", file=cmap_file)
+            print("1.0 0.0 0.0 1.0", file=cmap_file)
+            print("0.0 1.0 0.0 1.0", file=cmap_file)
+            print("0.0 0.0 1.0 1.0", file=cmap_file)
+            print("1.0 1.0 1.0 1.0", file=cmap_file)
+            cmap_file.close()
+
         print(f"local {filename_base}_speck = asset.resource(\"{filename_base}.speck\")", file=output_file)
+        print(f"local {filename_base}_color = asset.resource(\"{cmap_filename}\")", file=output_file)
         print("", file=output_file)
         print(f"local {filename_base} = {{", file=output_file)
         print(f"  Identifier = \"{filename_base}\",", file=output_file)
@@ -211,8 +237,11 @@ def make_stars_asset_from_dataframe(input_points_df,
         print(f"      Scale = {glare_scale}", file=output_file)
         print("    },", file=output_file)
         print(f"    MagnitudeExponent = {magnitude_exponent},", file=output_file)
-        print("    ColorMap = colormaps .. \"colorbv.cmap\",", file=output_file)
-        print("    OtherDataColorMap = colormaps .. \"viridis.cmap\",", file=output_file)
+        print(f"    ColorMap = {filename_base}_color,", file=output_file)
+        print("     ColorOption = \"Other Data\",", file=output_file)
+        print("    OtherData = \"texnum\",", file=output_file)
+        print(f"    OtherDataColorMap = {filename_base}_color,", file=output_file)
+        print(f"    OtherDataValueRange = {{ 0.0, 4.0 }},", file=output_file)
         print("    SizeComposition = \"Distance Modulus\",", file=output_file)
         print("    DataMapping = {", file=output_file)
         print("      Bv = \"colorb_v\",", file=output_file)
@@ -230,7 +259,7 @@ def make_stars_asset_from_dataframe(input_points_df,
         print("    ApproachFactor = 1000.0,", file=output_file)
         print("    ReachFactor = 5.0,", file=output_file)
         print("", file=output_file)
-        if fade_target:
+        if fade_targets:
             print(f"    OnApproach = {{ \"{fade_varname}\" }},", file=output_file)
             print(f"    OnReach = {{ \"{fade_varname}\" }},", file=output_file)
             print(f"    OnRecede = {{ \"{fade_varname}\" }},", file=output_file)
@@ -241,7 +270,7 @@ def make_stars_asset_from_dataframe(input_points_df,
         print("  }", file=output_file)
         print("}", file=output_file)
         print("asset.onInitialize(function()", file=output_file)
-        if fade_target:
+        if fade_targets:
             print(f"  openspace.action.registerAction({fade_varname})", file=output_file)
         print(f"  openspace.addSceneGraphNode({output_asset_position_name})", file=output_file)
         print(f"  openspace.addSceneGraphNode({filename_base})", file=output_file)
@@ -249,14 +278,122 @@ def make_stars_asset_from_dataframe(input_points_df,
         print("asset.onDeinitialize(function()", file=output_file)
         print(f"  openspace.removeSceneGraphNode({filename_base})", file=output_file)
         print(f"  openspace.removeSceneGraphNode({output_asset_position_name})", file=output_file)
-        if fade_target:
+        if fade_targets:
             print(f"  openspace.action.removeAction({fade_varname})", file=output_file)
         print("end)", file=output_file)
         print(f"asset.export({output_asset_position_name})", file=output_file)
         print(f"asset.export({filename_base})", file=output_file)
 
     # Return the name of the asset file we created.
-    return([output_filename])
+    return([output_filename, cmap_filename])
+
+def make_points_asset_from_dataframe(input_points_df, 
+                                     input_points_world_position,
+                                     filename_base,
+                                     fade_targets):
+    output_files = []
+
+    points_csv_filename = filename_base + "_points.csv"
+    with open(points_csv_filename, "w") as output_file:
+        print("x,y,z", file=output_file)
+        for index, row in input_points_df.iterrows():
+            print(f"{row['x']},{row['y']},{row['z']}", file=output_file)
+    output_file.close()
+
+    output_files.append(points_csv_filename)
+
+    # Next the asset file for the label file. Same name as the label file, but with .asset
+    # extension.
+    output_asset_filename = filename_base + "_points.asset"
+    output_asset_variable_name = filename_base + "_points"
+    output_asset_position_name = output_asset_variable_name + "_position"
+    with open(output_asset_filename, "w") as output_file:
+
+        # "Declare" fade var so it can be used below.
+        fade_varname = ""
+        if fade_targets:
+            fade_varname = f"{filename_base}_fade_command"
+
+            print(f"local {fade_varname} = {{", file=output_file)
+            print(f"    Identifier = \"{fade_varname}\",", file=output_file)
+            print(f"    Name = \"{fade_varname}\",", file=output_file)
+            print("    Command = [[", file=output_file)
+            print("      openspace.printInfo(\"Node: \" .. args.Node)", file=output_file)
+            print("      openspace.printInfo(\"Transition: \" .. args.Transition)", file=output_file)
+            print("", file=output_file)
+            print("      if args.Transition == \"Approaching\" then", file=output_file)
+            # This is pretty hacky - adding in the _points suffix...
+            for fade_target in fade_targets:
+                print(f"        openspace.setPropertyValueSingle(\"Scene.{fade_target + "_points"}.Renderable.Fade\", 0.0, 1.0)", file=output_file)
+            print("      elseif args.Transition == \"Exiting\" then", file=output_file)
+            for fade_target in fade_targets:
+                print(f"        openspace.setPropertyValueSingle(\"Scene.{fade_target + "_points"}.Renderable.Fade\", 1.0, 1.0)", file=output_file)
+            print("      end", file=output_file)
+            print("    ]],", file=output_file)
+            print("    IsLocal = true", file=output_file)
+            print("}", file=output_file)
+
+        print("local meters_in_pc = 3.0856775814913673e+16", file=output_file)
+        print(f"local {output_asset_position_name} = {{", file=output_file)
+        print(f"    Identifier = \"{output_asset_position_name}\",", file=output_file)
+        print("  Transform = {", file=output_file)
+        print("    Translation = {", file=output_file)
+        print("      Type = \"StaticTranslation\",", file=output_file)
+        print("      Position = {", file=output_file)
+        print(f"        {input_points_world_position["x"]} * meters_in_pc,", file=output_file)
+        print(f"        {input_points_world_position["y"]} * meters_in_pc,", file=output_file)
+        print(f"        {input_points_world_position["z"]} * meters_in_pc,", file=output_file)
+        print("      }", file=output_file)
+        print("     }", file=output_file)
+        print("    },", file=output_file)
+        print("  GUI = {", file=output_file)
+        print(f"    Name = \"{output_asset_position_name}\",", file=output_file)
+        print(f"    Path = \"/Points\",", file=output_file)
+        print(f"    Hidden = true", file=output_file)
+        print("  }", file=output_file)
+        print(" }", file=output_file)
+
+        print(f"local {output_asset_variable_name} = {{", file=output_file)
+        print(f"    Identifier = \"{output_asset_variable_name}\",", file=output_file)
+        print(f"    Parent = {output_asset_position_name}.Identifier,", file=output_file)
+        print("    Renderable = {", file=output_file)
+        print("        Type = \"RenderablePointCloud\",", file=output_file)
+        print(f"        File = asset.resource(\"{points_csv_filename}\"),", file=output_file)
+        print("         Unit = \"pc\",", file=output_file)
+        print(f"        Coloring = {{ FixedColor = {{ 1.0, 0.0, 0.0 }} }},", file=output_file)
+        print("    },", file=output_file)
+        print("    InteractionSphere = 1 * meters_in_pc,", file=output_file)
+        print("    ApproachFactor = 1000.0,", file=output_file)
+        print("    ReachFactor = 5.0,", file=output_file)
+        if fade_targets:
+            print(f"    OnApproach = {{ \"{fade_varname}\" }},", file=output_file)
+            print(f"    OnReach = {{ \"{fade_varname}\" }},", file=output_file)
+            print(f"    OnRecede = {{ \"{fade_varname}\" }},", file=output_file)
+            print(f"    OnExit = {{ \"{fade_varname}\" }},", file=output_file)
+        print("    GUI = {", file=output_file)
+        print(f"        Name = \"{output_asset_variable_name}\",", file=output_file)
+        print(f"        Path = \"/Points\"", file=output_file)
+        print("    }", file=output_file)
+        print("}", file=output_file)
+        print("asset.onInitialize(function()", file=output_file)
+        if fade_targets:
+            print(f"  openspace.action.registerAction({fade_varname})", file=output_file)
+        print(f"    openspace.addSceneGraphNode({output_asset_position_name});", file=output_file)
+        print(f"    openspace.addSceneGraphNode({output_asset_variable_name});", file=output_file)
+        print("end)", file=output_file)
+        print("asset.onDeinitialize(function()", file=output_file)
+        print(f"    openspace.removeSceneGraphNode({output_asset_variable_name});", file=output_file)
+        print(f"    openspace.removeSceneGraphNode({output_asset_position_name});", file=output_file)
+        if fade_targets:
+            print(f"  openspace.action.removeAction({fade_varname})", file=output_file)
+        print("end)", file=output_file)
+        print(f"asset.export({output_asset_position_name})", file=output_file)
+        print(f"asset.export({output_asset_variable_name})", file=output_file)
+
+
+    output_files.append(output_asset_filename)
+
+    return(output_files)
 
 def make_labels_from_dataframe(input_points_df, 
                                input_points_world_position,
@@ -399,11 +536,12 @@ def main():
         input_points_df.rename(columns={input_points_df.columns[0]: "ID"},
                                 inplace=True)
         
-        # The fade_target argument is optional. If it's blank, it's a NaN, which
+        # The fade_targets argument is optional. If it's blank, it's a NaN, which
         # is weird to test for if it might be a string. So convert it.
-        fade_target = None
-        if (str(row["fade_target"]) != "nan"):
-            fade_target = row["fade_target"]
+        fade_targets = None
+        if (str(row["fade_targets"]) != "nan"):
+            # There may be more than one fade target, separated by commas.
+            fade_targets = row["fade_targets"].split(",")
 
         # Let's get the base of the filename (no extension) to use for generating
         # output files.
@@ -446,6 +584,17 @@ def main():
                                            label_maxsize=row["label_maxsize"],
                                            enabled=row["enabled"])
             
+        elif row["type"] == "points":
+            print("Creating points... ", end="", flush=True)
+            # Now the speck file. This is what RenderableStars will use to draw the
+            # points. The speck file doesn't care about the centroid; the translation
+            # to "world" space is applied by the renderable.
+            files_created += \
+                make_points_asset_from_dataframe(input_points_df=input_points_df, 
+                                                 input_points_world_position=input_points_world_position,
+                                                 filename_base=filename_base,
+                                                 fade_targets=fade_targets)
+            
         # Datasets contain many points that fall into common groupings, such as phyla,
         # classes, kingdoms, etc. Rather than have many points with the same label, we
         # can create a single label for the group that sits in the middle of all these
@@ -480,7 +629,8 @@ def main():
                                                 filename_base=filename_base,
                                                 lum=row["lum"], 
                                                 absmag=row["absmag"],
-                                                colorb_v=row["colorb_v"])
+                                                colorb_v=row["colorb_v"],
+                                                texnum=row["texnum"])
 
             # Now an asset file that will be used to load the speck file into OpenSpace.
             files_created += \
@@ -494,9 +644,8 @@ def main():
                                                 glare_multiplier=row["glare_multiplier"],
                                                 glare_gamma=row["glare_gamma"],
                                                 glare_scale=row["glare_scale"],
-                                                fade_target=fade_target)
+                                                fade_targets=fade_targets)
         print("Done.")
-
 
     # Now we need to make a list of all the .asset and .speck files we created
     # so these can be flushed from the cache directory.
