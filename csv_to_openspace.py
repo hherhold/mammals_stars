@@ -325,6 +325,8 @@ def make_points_asset_and_csv_from_dataframe(input_points_df,
 
     # Now write the CSV file.
     points_csv_filename = args.output_dir + "/" + filename_base + "_points.csv"
+    # Local filename is just the filename with no path.
+    local_points_csv_filename = os.path.basename(points_csv_filename)
     with open(points_csv_filename, "w") as output_file:
         if color_by_column:
             print(f"x,y,z,color,{color_by_column}", file=output_file)
@@ -395,7 +397,7 @@ def make_points_asset_and_csv_from_dataframe(input_points_df,
         print(f"    Parent = {output_asset_position_name}.Identifier,", file=output_file)
         print("    Renderable = {", file=output_file)
         print("        Type = \"RenderablePointCloud\",", file=output_file)
-        print(f"        File = asset.resource(\"{points_csv_filename}\"),", file=output_file)
+        print(f"        File = asset.resource(\"{local_points_csv_filename}\"),", file=output_file)
         print("         Texture = { File = asset.resource(\"point3A.png\") },", file=output_file)
         print("         Unit = \"pc\",", file=output_file)
         print(f"        Coloring = {{ FixedColor = {{ 1.0, 0.0, 0.0 }} }},", file=output_file)
@@ -440,6 +442,7 @@ def make_labels_from_dataframe(input_points_df,
     output_files = []
 
     label_filename = args.output_dir + "/" + filename_base + "_" + label_column + ".label"
+    local_label_filename = os.path.basename(label_filename)
     with open(label_filename, "w") as output_file:
         for index, row in input_points_df.iterrows():
             print(f"{row['x']} {row['y']} {row['z']} id {index} text {row[label_column]}", file=output_file)
@@ -478,7 +481,7 @@ def make_labels_from_dataframe(input_points_df,
         print("    Renderable = {", file=output_file)
         print("        Type = \"RenderablePointCloud\",", file=output_file)
         print("        Labels = {", file=output_file)
-        print(f"            File = asset.resource(\"{label_filename}\"),", file=output_file)
+        print(f"            File = asset.resource(\"{local_label_filename}\"),", file=output_file)
         print(f"            Enabled = {enabled},", file=output_file)
         print("            Unit = \"pc\",", file=output_file)
         print(f"            Size = {label_size},", file=output_file)
