@@ -2,28 +2,34 @@
 
 """
 
-# CSV to speck and labels
+# CSV to OpenSpace
 
 Each CSV file needs to be turned into a number of other files for OpenSpace.
-First is the speck file, which contains the actual XYZ coordinates of the points,
-drawn using RenderableStars. (Used to be RenderablePointCloud, but stars look
-better.) We also need to create label files, which *are* RenderablePointClouds, except
-without the actual points (though it does have point locations for the labels). These
-turn into individual asset files. Each set of stars can have more than one set of labels.
 
-Additionally, every CSV file has slightly different parameters as far as how it's
-drawn by openspace. This info is all contained in the dataset csv file and these
-parameters are used to create the speck and asset files. Some parameters affect
-the speck file and some are renderable parameters and go in the asset file.
+For Stars, first is the speck file, which contains the actual XYZ coordinates of the
+points, drawn using RenderableStars. We also need to create label files, which are
+RenderablePointClouds, except without the actual points (though it does have point
+locations for the labels). These turn into individual asset files. Each set of stars can
+have more than one set of labels.
+
+Additionally, every CSV file has slightly different parameters as far as how it's drawn by
+openspace. This info is all contained in the dataset csv file and these parameters are
+used to create the speck and asset files. Some parameters affect the speck file and some
+are renderable parameters and go in the asset file.
 
 Labels are handled differently than stars, even though they're plotted at the same
-locations as the stars. The labels are RenderablePointClouds that have no points, only
-the locations of the labels. The label locations are in the CSV file, which must be
-converted and copied to the OpenSpace asset dir as a label file. Additionally,
-several different taxonomic levels and naming conventions may be used, which requires
-different label files for each. Each line of the dataset CSV file determines
-which column in the CSV file to use for generating labels. The 'type' column in the
-dataset CSV file determines whether to make a stars or labels asset file.
+locations as the stars. The labels are RenderablePointClouds that have no points, only the
+locations of the labels. The label locations are in the CSV file, which must be converted
+and copied to the OpenSpace asset dir as a label file. Additionally, several different
+taxonomic levels and naming conventions may be used, which requires different label files
+for each. Each line of the dataset CSV file determines which column in the CSV file to use
+for generating labels. The 'type' column in the dataset CSV file determines whether to
+make a stars or labels asset file.
+
+Alternatively, or additionally, points can be rendered as RenderablePointClouds. These are
+very similar to the stars, except for some parameter differences regarding size and color.
+Stars are a bit less flexible with colors, but a bit more flexible regarding sizes. Points
+can also have a custom glyph/texture, which (I think) is not available for stars.
 
 """
 
@@ -35,22 +41,22 @@ import os
 import math
 from pathlib import Path
 
-from random import randrange
-
-
 parser = argparse.ArgumentParser(description="Process input CSV files for OpenSpace.")
 parser.add_argument("-i", "--input_dataset_csv_file", help="Input dataset CSV file.", 
                     required=True)
 parser.add_argument("-c", "--cache_dir", help="OpenSpace cache directory.",
                     required=True)
-parser.add_argument("-a", "--asset_dir", help="Output directory for assets.",
+parser.add_argument("-a", "--asset_dir", help="OpenSpace directory for assets.",
                     required=True)
+parser.add_argument("-o", "--output_dir", help="Directory for local copy of output files.",
+                    default=".")
 parser.add_argument("-v", "--verbose", help="Verbose output.", action="store_true")
+args = parser.parse_args()
 
 def make_stars_speck_from_dataframe(input_points_df, filename_base,
                                     lum, absmag, colorb_v, texnum):
 
-    output_speck_filename = filename_base + ".speck"
+    output_speck_filename = args.output_dir + "/" + filename_base + ".speck"
 
     with open(output_speck_filename, "w") as output_file:
         # Dump the speck file header info. 
@@ -130,7 +136,7 @@ def make_stars_asset_from_dataframe(input_points_df,
                                     glare_scale,
                                     fade_targets):
 
-    output_filename = filename_base + ".asset"
+    output_filename = args.output_dir + "/" + filename_base + ".asset"
     output_asset_position_name = filename_base + "_position"
 
     with open(output_filename, "w") as output_file:
@@ -202,7 +208,7 @@ def make_stars_asset_from_dataframe(input_points_df,
         print("}", file=output_file)
 
         # Hack - colormap file.
-        cmap_filename = filename_base + ".cmap"
+        cmap_filename = args.output_dir + "/" + filename_base + ".cmap"
         with open(cmap_filename, "w") as cmap_file:
             print("# OpenSpace colormap file", file=cmap_file)
             print("", file=cmap_file)
@@ -287,24 +293,55 @@ def make_stars_asset_from_dataframe(input_points_df,
     # Return the name of the asset file we created.
     return([output_filename, cmap_filename])
 
-def make_points_asset_from_dataframe(input_points_df, 
-                                     input_points_world_position,
-                                     filename_base,
-                                     fade_targets):
+def make_points_asset_and_csv_from_dataframe(input_points_df, 
+                                             input_points_world_position,
+                                             filename_base,
+                                             fade_targets,
+                                             color_by_column):
     output_files = []
 
-    points_csv_filename = filename_base + "_points.csv"
+    # First the CSV file. This is just the points in CSV format, however we may need to
+    # add a color column. If specified, we need to look at the color_by_column and
+    # figure out how many unique values there are in that column. We'll assign a color
+    # index between 1 and whatever the number of unique values is. We'll then use a
+    # colormap to assign a color to each index.
+    if str(color_by_column) != "nan":
+        unique_values = input_points_df[color_by_column].unique()
+        num_unique_values = len(unique_values)
+        color_index = 1
+        color_map = {}
+        for value in unique_values:
+            color_map[value] = color_index
+            color_index += 1
+
+        # Add the color column to the dataframe.
+        input_points_df["color"] = input_points_df[color_by_column].map(color_map)
+
+        # Add another column that is the value of the color_by_column. This is useful for
+        # labels.
+        input_points_df["color_by_column"] = input_points_df[color_by_column]
+    else:
+        color_by_column = False
+
+    # Now write the CSV file.
+    points_csv_filename = args.output_dir + "/" + filename_base + "_points.csv"
     with open(points_csv_filename, "w") as output_file:
-        print("x,y,z", file=output_file)
+        if color_by_column:
+            print(f"x,y,z,color,{color_by_column}", file=output_file)
+        else:
+            print("x,y,z", file=output_file)
         for index, row in input_points_df.iterrows():
-            print(f"{row['x']},{row['y']},{row['z']}", file=output_file)
-    output_file.close()
+            if color_by_column:
+                print(f"{row['x']},{row['y']},{row['z']},{row['color']},{row['color_by_column']}", file=output_file)
+            else:
+                print(f"{row['x']},{row['y']},{row['z']}", file=output_file)
+        output_file.close()
 
     output_files.append(points_csv_filename)
 
     # Next the asset file for the label file. Same name as the label file, but with .asset
     # extension.
-    output_asset_filename = filename_base + "_points.asset"
+    output_asset_filename = args.output_dir + "/" + filename_base + "_points.asset"
     output_asset_variable_name = filename_base + "_points"
     output_asset_position_name = output_asset_variable_name + "_position"
     with open(output_asset_filename, "w") as output_file:
@@ -359,6 +396,7 @@ def make_points_asset_from_dataframe(input_points_df,
         print("    Renderable = {", file=output_file)
         print("        Type = \"RenderablePointCloud\",", file=output_file)
         print(f"        File = asset.resource(\"{points_csv_filename}\"),", file=output_file)
+        print("         Texture = { File = asset.resource(\"point3A.png\") },", file=output_file)
         print("         Unit = \"pc\",", file=output_file)
         print(f"        Coloring = {{ FixedColor = {{ 1.0, 0.0, 0.0 }} }},", file=output_file)
         print("    },", file=output_file)
@@ -401,7 +439,7 @@ def make_labels_from_dataframe(input_points_df,
                                label_column, label_size, label_minsize, label_maxsize, enabled):
     output_files = []
 
-    label_filename = filename_base + "_" + label_column + ".label"
+    label_filename = args.output_dir + "/" + filename_base + "_" + label_column + ".label"
     with open(label_filename, "w") as output_file:
         for index, row in input_points_df.iterrows():
             print(f"{row['x']} {row['y']} {row['z']} id {index} text {row[label_column]}", file=output_file)
@@ -410,7 +448,7 @@ def make_labels_from_dataframe(input_points_df,
 
     # Next the asset file for the label file. Same name as the label file, but with .asset
     # extension.
-    output_asset_filename = filename_base + "_" + label_column + ".asset"
+    output_asset_filename = args.output_dir + "/" + filename_base + "_" + label_column + ".asset"
     output_asset_variable_name = filename_base + "_" + label_column + "_labels"
     output_asset_position_name = output_asset_variable_name + "_position"
     with open(output_asset_filename, "w") as output_file:
@@ -514,7 +552,9 @@ def make_group_labels_from_dataframe(input_points_df,
     return(output_files)
 
 def main():
-    args = parser.parse_args()
+    # If an output directory was specified, make sure it exists.
+    if args.output_dir != ".":
+        Path(args.output_dir).mkdir(parents=True, exist_ok=True)
 
     # Read the dataset CSV file into a pandas dataframe.
     input_dataset_df = pd.read_csv(args.input_dataset_csv_file, 
@@ -586,14 +626,12 @@ def main():
             
         elif row["type"] == "points":
             print("Creating points... ", end="", flush=True)
-            # Now the speck file. This is what RenderableStars will use to draw the
-            # points. The speck file doesn't care about the centroid; the translation
-            # to "world" space is applied by the renderable.
             files_created += \
-                make_points_asset_from_dataframe(input_points_df=input_points_df, 
-                                                 input_points_world_position=input_points_world_position,
-                                                 filename_base=filename_base,
-                                                 fade_targets=fade_targets)
+                make_points_asset_and_csv_from_dataframe(input_points_df=input_points_df, 
+                                                         input_points_world_position=input_points_world_position,
+                                                         filename_base=filename_base,
+                                                         fade_targets=fade_targets,
+                                                         color_by_column=row["color_by_column"])
             
         # Datasets contain many points that fall into common groupings, such as phyla,
         # classes, kingdoms, etc. Rather than have many points with the same label, we
