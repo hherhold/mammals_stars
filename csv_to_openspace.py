@@ -323,6 +323,22 @@ def make_points_asset_and_csv_from_dataframe(input_points_df,
     else:
         color_by_column = False
 
+    # Now a color file, since we know how many colors we need.
+    color_filename = args.output_dir + "/" + filename_base + ".cmap"
+    color_local_filename = os.path.basename(color_filename)
+    with open(color_filename, "w") as color_file:
+        print("# OpenSpace colormap file", file=color_file)
+        print("", file=color_file)
+        #print(f"{num_unique_values}", file=color_file)
+        #for value in unique_values:
+        #    print(f"1.0 0.0 0.0 1.0", file=color_file)
+        print("2", file=color_file)
+        print("0.0 0.0 1.0 1.0", file=color_file)
+        print("0.0 1.0 0.0 1.0", file=color_file)
+        #print("0.0 0.0 1.0 1.0", file=color_file)
+        color_file.close()
+    output_files.append(color_filename)
+
     # Now write the CSV file.
     points_csv_filename = args.output_dir + "/" + filename_base + "_points.csv"
     # Local filename is just the filename with no path.
@@ -400,7 +416,9 @@ def make_points_asset_and_csv_from_dataframe(input_points_df,
         print(f"        File = asset.resource(\"{local_points_csv_filename}\"),", file=output_file)
         print("         Texture = { File = asset.resource(\"point3A.png\") },", file=output_file)
         print("         Unit = \"pc\",", file=output_file)
-        print(f"        Coloring = {{ FixedColor = {{ 1.0, 0.0, 0.0 }} }},", file=output_file)
+        #print(f"        Coloring = {{ FixedColor = {{ 1.0, 0.0, 0.0 }} }},", file=output_file)
+        print(f"        Coloring = {{ ColorMapping = {{ File = asset.resource(\"{color_local_filename}\"),", file=output_file)
+        print(f"                                      Parameter = \"color\" }} }},", file=output_file)
         print("    },", file=output_file)
         print("    InteractionSphere = 1 * meters_in_pc,", file=output_file)
         print("    ApproachFactor = 1000.0,", file=output_file)
@@ -692,13 +710,18 @@ def main():
     # so these can be flushed from the cache directory.
     print("Cleaning cache directory...", end="", flush=True)
     for file in files_created:
+        # Get just the filename, not the path.
+        file = os.path.basename(file)
         # Ignore any errors if the file doesn't exist.
         try:
             if args.verbose:
                 print(f"Removing {args.cache_dir + '/' + file}")
-            os.remove(args.cache_dir + "/" + file)
-        except:
+            shutil.rmtree(args.cache_dir + "/" + file)
+        except FileNotFoundError:
             pass
+        # Notify all other exceptions.
+        except Exception as e:
+            print(f"Error removing file {args.cache_dir + '/' + file}: {e}")
     print("Done.")
     
     # Now copy the speck and asset files to the output directory.
